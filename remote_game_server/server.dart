@@ -144,11 +144,11 @@ class GameServer {
       
       if (clients.length == 2 && !gameStarted) {
         gameStarted = true;
-        print('🎮 Partita iniziata! Turno del giocatore 1');
+        print('Partita iniziata! Turno del giocatore 1');
         broadcast('TURN $currentTurn');
       } else if (clients.length == 1) {
         _safeSend(client, 'WAITING\n');
-        print('⏳ In attesa del secondo giocatore...');
+        print('In attesa del secondo giocatore...');
       }
     } catch (e) {
       print('Errore aggiunta client: $e');
@@ -169,7 +169,7 @@ class GameServer {
       int playerNumber = clients.indexOf(client) + 1;
       
       if (playerNumber <= 0) {
-        print('⚠️ Client non trovato nella lista');
+        print('Client non trovato nella lista');
         return;
       }
       
@@ -188,19 +188,19 @@ class GameServer {
       bool alive = board.reveal(r, c);
 
       if (!alive) {
-        print('💣 BOOM! Mina colpita dal giocatore $playerNumber');
+        print('Mina colpita dal giocatore $playerNumber');
         broadcast('BOARD_UPDATE ${board.toJson()}');
         broadcast('BOOM');
         gameStarted = false;
       } else if (board.checkWin()) {
-        print('🎉 VITTORIA!');
+        print('VITTORIA!');
         broadcast('BOARD_UPDATE ${board.toJson()}');
         broadcast('WIN');
         gameStarted = false;
       } else {
         // Cambia turno
         currentTurn = currentTurn == 1 ? 2 : 1;
-        print('🔄 Turno passato al giocatore $currentTurn');
+        print('Turno passato al giocatore $currentTurn');
         
         broadcast('BOARD_UPDATE ${board.toJson()}');
         broadcast('TURN $currentTurn');
@@ -358,4 +358,5 @@ void main() async {
     print('ERRORE CRITICO: $e');
     exit(1);
   }
+
 }
