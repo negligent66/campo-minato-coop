@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:io'; 
 import 'dart:convert';
 import 'dart:math';
 
@@ -14,24 +14,30 @@ class Board {
   int cols;
   int mines;
   late List<List<Cell>> grid;
+  bool minesPlaced = false; 
 
   Board(this.rows, this.cols, this.mines) {
     grid = List.generate(rows, (_) => List.generate(cols, (_) => Cell()));
-    _placeMines();
-    _calculateAdjMines();
   }
 
-  void _placeMines() {
+  void _placeMinesAfterFirstClick(int firstR, int firstC) {
     final rand = Random();
     int placed = 0;
+    
     while (placed < mines) {
       int r = rand.nextInt(rows);
       int c = rand.nextInt(cols);
-      if (!grid[r][c].mine) {
+      
+      bool tooClose = (r - firstR).abs() <= 1 && (c - firstC).abs() <= 1;
+      
+      if (!grid[r][c].mine && !tooClose) {
         grid[r][c].mine = true;
         placed++;
       }
     }
+    
+    minesPlaced = true;
+    _calculateAdjMines();
   }
 
   void _calculateAdjMines() {
@@ -58,6 +64,10 @@ class Board {
   bool reveal(int r, int c) {
     if (r < 0 || r >= rows || c < 0 || c >= cols) return true;
     if (grid[r][c].revealed || grid[r][c].flagged) return true;
+    
+    if (!minesPlaced) {
+      _placeMinesAfterFirstClick(r, c);
+    }
     
     grid[r][c].revealed = true;
     
@@ -131,15 +141,10 @@ class GameServer {
       clients.add(client);
       int playerNumber = clients.length;
       
-      print('✓ Giocatore $playerNumber connesso da ${client.remoteAddress.address}');
+      print('Giocatore $playerNumber connesso da ${client.remoteAddress.address}');
       
-      // Invia il numero del giocatore
       _safeSend(client, 'PLAYER_NUMBER $playerNumber\n');
-      
-      // Invia info sul gioco
       _safeSend(client, 'GAME_INFO ${board.mines}\n');
-      
-      // Invia la board
       _safeSend(client, 'BOARD_UPDATE ${board.toJson()}\n');
       
       if (clients.length == 2 && !gameStarted) {
@@ -156,13 +161,12 @@ class GameServer {
   }
 
   void _safeSend(Socket client, String msg) {
-  try {
-    client.write(msg);
-  } catch (e) {
-    print('Errore invio messaggio: $e');
+    try {
+      client.write(msg);
+    } catch (e) {
+      print('Errore invio messaggio: $e');
+    }
   }
-}
-
 
   void handleReveal(Socket client, int r, int c) {
     try {
@@ -188,7 +192,7 @@ class GameServer {
       bool alive = board.reveal(r, c);
 
       if (!alive) {
-        print('Mina colpita dal giocatore $playerNumber');
+        print('BOOM! Mina colpita dal giocatore $playerNumber');
         broadcast('BOARD_UPDATE ${board.toJson()}');
         broadcast('BOOM');
         gameStarted = false;
@@ -198,7 +202,6 @@ class GameServer {
         broadcast('WIN');
         gameStarted = false;
       } else {
-        // Cambia turno
         currentTurn = currentTurn == 1 ? 2 : 1;
         print('Turno passato al giocatore $currentTurn');
         
@@ -234,7 +237,6 @@ class GameServer {
       bool changed = board.toggleFlag(r, c);
       
       if (changed) {
-        // Cambia turno anche per le bandiere
         currentTurn = currentTurn == 1 ? 2 : 1;
         print('Turno passato al giocatore $currentTurn');
         
@@ -247,22 +249,21 @@ class GameServer {
   }
 
   void broadcast(String msg) {
-  List<Socket> toRemove = [];
-  
-  for (var c in clients) {
-    try {
-      c.write(msg + '\n');
-    } catch (e) {
-      print('Errore broadcast a client: $e');
-      toRemove.add(c);
+    List<Socket> toRemove = [];
+    
+    for (var c in clients) {
+      try {
+        c.write(msg + '\n');
+      } catch (e) {
+        print('Errore broadcast a client: $e');
+        toRemove.add(c);
+      }
+    }
+    
+    for (var c in toRemove) {
+      removeClient(c);
     }
   }
-  
-  for (var c in toRemove) {
-    removeClient(c);
-  }
-}
-
 
   void removeClient(Socket client) {
     try {
@@ -342,12 +343,14 @@ class ClientHandler {
 void main() async {
   int port = 4040;
   try {
-    final board = Board(16, 16, 40);
+    final board = Board(20, 12, 40);
     final gameServer = GameServer(board);
 
     final server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
     
-    print('Server avviato sulla porta $port');
+    print('Server Campo Minato avviato sulla porta $port');
+    print('Configurazione: 20x12 con 40 mine');
+    print('Le mine verranno piazzate dopo il primo click');
 
     server.listen((client) {
       print('\n→ Nuova connessione da ${client.remoteAddress.address}:${client.remotePort}');
@@ -358,5 +361,4 @@ void main() async {
     print('ERRORE CRITICO: $e');
     exit(1);
   }
-
 }
